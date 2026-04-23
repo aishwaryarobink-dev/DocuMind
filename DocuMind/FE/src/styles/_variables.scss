@@ -1,0 +1,112 @@
+
+// ── Backgrounds (dark purple theme) ──────────────────────────
+$bg-900:   #0E0B1A;   // darkest — main app background
+$bg-800:   #130F22;   // sidebar, panels
+$bg-700:   #1A1530;   // cards, message bubbles
+$bg-600:   #221C3D;   // hover states
+
+// ── Purple accent ─────────────────────────────────────────────
+$purp-700: #4C1D95;
+$purp-600: #5B21B6;
+$purp-500: #7C3AED;   // primary brand color
+$purp-400: #8B5CF6;   // lighter
+$purp-300: #A78BFA;   // text on dark backgrounds
+$purp-200: #C4B5FD;
+$purp-100: #EDE9FE;   // very light fill
+$purp-50:  #F5F3FF;
+
+// ── Neutral ───────────────────────────────────────────────────
+$slate-700: #334155;
+$slate-600: #475569;
+$slate-500: #64748B;
+$slate-400: #94A3B8;
+$slate-300: #CBD5E1;
+$slate-200: #E2E8F0;
+$slate-100: #F1F5F9;
+$white:     #FFFFFF;
+
+// ── Semantic ──────────────────────────────────────────────────
+$success:   #10B981;
+$warning:   #F59E0B;
+$danger:    #EF4444;
+$info:      #3B82F6;
+
+// ── Typography ────────────────────────────────────────────────
+$font-display: 'Lora', Georgia, serif;          // headings, logo
+$font-body:    'Plus Jakarta Sans', system-ui, sans-serif;  // body text
+$font-mono:    'SF Mono', 'Fira Code', monospace;  // code, commits
+
+// ── Type scale ────────────────────────────────────────────────
+$text-xs:   0.72rem;
+$text-sm:   0.82rem;
+$text-base: 0.9rem;
+$text-md:   1rem;
+$text-lg:   1.125rem;
+$text-xl:   1.25rem;
+$text-2xl:  1.5rem;
+
+// ── Spacing (8px base grid) ───────────────────────────────────
+$sp-1:  4px;
+$sp-2:  8px;
+$sp-3:  12px;
+$sp-4:  16px;
+$sp-5:  20px;
+$sp-6:  24px;
+$sp-8:  32px;
+$sp-10: 40px;
+$sp-12: 48px;
+
+// ── Border radius ─────────────────────────────────────────────
+$radius-sm:   6px;
+$radius-md:   10px;
+$radius-lg:   14px;
+$radius-xl:   20px;
+$radius-full: 999px;
+
+// ── Shadows ───────────────────────────────────────────────────
+$shadow-sm:   0 1px 3px rgba(14, 11, 26, 0.12);
+$shadow-md:   0 4px 12px rgba(14, 11, 26, 0.20);
+$shadow-purp: 0 4px 20px rgba(124, 58, 237, 0.35);
+
+// ── Transitions ───────────────────────────────────────────────
+$t-fast:   all 0.15s ease;
+$t-base:   all 0.22s ease;
+$t-spring: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+// ── Breakpoints ───────────────────────────────────────────────
+$bp-sm: 640px;
+$bp-md: 768px;
+$bp-lg: 1024px;
+
+// ── Mixins (reusable CSS patterns) ────────────────────────────
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+// Responsive helper — usage: @include respond-to(md) { ... }
+@mixin respond-to($bp) {
+  @if $bp == sm { @media (max-width: $bp-sm) { @content; } }
+  @if $bp == md { @media (max-width: $bp-md) { @content; } }
+  @if $bp == lg { @media (max-width: $bp-lg) { @content; } }
+}
+
+// Thin scrollbar for dark backgrounds
+@mixin scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba($white, 0.10) transparent;
+  &::-webkit-scrollbar        { width: 4px; }
+  &::-webkit-scrollbar-thumb  { background: rgba($white, 0.12); border-radius: $radius-full; }
+}

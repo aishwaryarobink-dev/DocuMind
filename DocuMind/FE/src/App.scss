@@ -1,0 +1,70 @@
+@use './styles/variables' as *;   
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  background: $bg-900;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $sp-3 $sp-6;
+  background: $bg-800;
+  border-bottom: 1px solid rgba($white, 0.08);
+  flex-shrink: 0;
+}
+
+.logo {
+  font-family: $font-display;
+  font-size: $text-xl;
+  color: $white;
+  letter-spacing: -0.02em;
+}
+
+.badge {
+  font-size: $text-xs;
+  padding: 3px 10px;
+  background: rgba($purp-500, 0.15);
+  border: 1px solid rgba($purp-500, 0.3);
+  border-radius: $radius-full;
+  color: $purp-300;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel {
+  width: 260px;
+  flex-shrink: 0;
+  background: $bg-800;
+  border-right: 1px solid rgba($white, 0.07);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panelText {
+  font-size: $text-sm;
+  color: $slate-600;
+  font-style: italic;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mainText {
+  font-size: $text-sm;
+  color: $slate-600;
+  font-style: italic;
+}
