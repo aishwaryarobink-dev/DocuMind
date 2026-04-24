@@ -5,8 +5,9 @@ dist/
 .env.local
 
 #BE
-__pycache__/
+.venv/
 venv/
+__pycache__/
 *.pyc
 chroma_store/
 .DS_Store
