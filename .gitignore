@@ -1,0 +1,16 @@
+#FE
+node_modules/
+dist/
+.env
+.env.local
+
+#BE
+__pycache__/
+venv/
+*.pyc
+chroma_store/
+.DS_Store
+
+#GENERAL
+*.log
+*.tmp
