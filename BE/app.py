@@ -404,4 +404,5 @@ if __name__ == "__main__":
     print(f"\nDocuMind backend starting...")
     print(f"ChromaDB path: {CHROMA_PATH}")
     print(f"Embedding model: all-MiniLM-L6-v2 (loads on first upload)\n")
-    app.run(debug=True, port=5001, threaded=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
