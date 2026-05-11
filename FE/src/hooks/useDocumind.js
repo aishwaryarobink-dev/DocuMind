@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+const API = import.meta.env.VITE_API_URL 
 
 function getSessionId() {
   let id = sessionStorage.getItem('documind_session')
