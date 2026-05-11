@@ -18,8 +18,16 @@ from groq import Groq
 
 load_dotenv()
 app=Flask(__name__)
-CORS(app, origins="*")
-
+CORS(app, resources={r"/*": {
+    "origins": [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "https://documind-clinical-ai.vercel.app/"
+    ],
+    "methods": ["GET", "POST", "DELETE", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"],
+    "supports_credentials": False
+}})
 #chroma db setup
 CHROMA_PATH="./chroma_store"
 Path(CHROMA_PATH).mkdir(exist_ok=True)
