@@ -1,0 +1,154 @@
+@use '../styles/tokens' as *;
+
+.panel {
+  width: 260px;
+  flex-shrink: 0;
+  @include flex-col;
+  background: $bg-800;
+  border-right: 1px solid rgba($white, 0.07);
+  height: 100%;
+
+  @include respond-to(md) { width: 220px; }
+  @include respond-to(sm) { display: none; }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+.header {
+  @include flex-between;
+  padding: $sp-4 $sp-4 $sp-3;
+  flex-shrink: 0;
+}
+.title {
+  font-size: $text-sm;
+  font-weight: 600;
+  color: $slate-300;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.count {
+  font-size: $text-xs;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: rgba($purp-500, 0.15);
+  color: $purp-300;
+  border-radius: $radius-full;
+}
+
+// ── Drop Zone ─────────────────────────────────────────────────────────────────
+.dropZone {
+  margin: 0 $sp-3 $sp-3;
+  padding: $sp-5 $sp-3;
+  border: 1.5px dashed rgba($purp-500, 0.3);
+  border-radius: $radius-lg;
+  @include flex-center;
+  flex-direction: column;
+  gap: $sp-2;
+  cursor: pointer;
+  transition: $t-base;
+  min-height: 110px;
+
+  &:hover { border-color: rgba($purp-400, 0.6); background: rgba($purp-500, 0.05); }
+  &.dragging { border-color: $purp-400; background: rgba($purp-500, 0.1); }
+}
+.hiddenInput { display: none; }
+
+.dropIcon { color: $purp-400; margin-bottom: $sp-1; }
+.dropTitle { font-size: $text-sm; font-weight: 500; color: $slate-400; }
+.dropSub   { font-size: $text-xs; color: $slate-600; }
+
+.uploadState {
+  @include flex-center;
+  flex-direction: column;
+  gap: $sp-2;
+  text-align: center;
+}
+.spinner {
+  width: 22px; height: 22px;
+  border: 2px solid rgba($purp-400, 0.2);
+  border-top-color: $purp-400;
+  border-radius: $radius-full;
+  animation: spin 0.8s linear infinite;
+}
+.uploadDone  { font-size: 1.25rem; color: $success; }
+.uploadError { font-size: 1.25rem; color: $danger; }
+.uploadName  { font-size: $text-sm; color: $slate-300; font-weight: 500;
+  max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uploadSub   { font-size: $text-xs; color: $slate-500; }
+
+// ── Doc List ──────────────────────────────────────────────────────────────────
+.docList {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 $sp-3;
+  @include scrollbar-thin;
+}
+.emptyText {
+  font-size: $text-xs;
+  color: $slate-600;
+  text-align: center;
+  padding: $sp-6 $sp-4;
+  font-style: italic;
+  line-height: 1.7;
+}
+
+.docItem {
+  display: flex;
+  align-items: center;
+  gap: $sp-2;
+  padding: $sp-3;
+  border-radius: $radius-md;
+  background: rgba($white, 0.03);
+  border: 1px solid rgba($white, 0.05);
+  margin-bottom: $sp-2;
+  transition: $t-fast;
+
+  &:hover {
+    background: rgba($purp-500, 0.08);
+    border-color: rgba($purp-500, 0.2);
+
+    .docDelete { opacity: 1; }
+  }
+}
+.docIcon { color: $purp-400; flex-shrink: 0; }
+.docInfo { flex: 1; min-width: 0; }
+.docName {
+  font-size: $text-sm;
+  color: $slate-200;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.docMeta { font-size: 10px; color: $slate-600; margin-top: 2px; }
+
+.docDelete {
+  opacity: 0;
+  color: $slate-600;
+  padding: $sp-1;
+  border-radius: $radius-sm;
+  transition: $t-fast;
+  flex-shrink: 0;
+  font-size: $text-xs;
+  font-weight: 600;
+  width: 22px; height: 22px;
+  @include flex-center;
+
+  &:hover { color: $danger; background: rgba($danger, 0.1); opacity: 1; }
+  &.confirming { color: $warning; opacity: 1; background: rgba($warning, 0.1); }
+}
+
+// ── Footer ────────────────────────────────────────────────────────────────────
+.footer {
+  padding: $sp-3 $sp-4;
+  border-top: 1px solid rgba($white, 0.05);
+  flex-shrink: 0;
+}
+.footerBadge {
+  display: flex;
+  align-items: center;
+  gap: $sp-2;
+  color: $slate-600;
+  font-size: $text-xs;
+  margin-bottom: 4px;
+}
+.footerSub { font-size: 10px; color: rgba($slate-600, 0.6); }

@@ -1,0 +1,92 @@
+@use '../styles/tokens' as *;
+
+.wrap {
+  @include flex-col;
+  gap: $sp-2;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.inputBox {
+  display: flex;
+  align-items: flex-end;
+  gap: $sp-2;
+  background: $bg-700;
+  border: 1.5px solid rgba($white, 0.08);
+  border-radius: $radius-xl;
+  padding: $sp-3 $sp-3 $sp-3 $sp-5;
+  transition: $t-base;
+
+  &:focus-within {
+    border-color: rgba($purp-400, 0.5);
+    box-shadow: 0 0 0 3px rgba($purp-500, 0.08);
+  }
+
+  &.inputDisabled {
+    opacity: 0.5;
+  }
+}
+
+.textarea {
+  flex: 1;
+  background: transparent;
+  resize: none;
+  color: $white;
+  font-size: $text-base;
+  line-height: 1.6;
+  max-height: 120px;
+  overflow-y: auto;
+  padding: $sp-1 0;
+  @include scrollbar-thin;
+
+  &::placeholder { color: $slate-600; }
+  &:disabled      { cursor: not-allowed; }
+}
+
+.sendBtn {
+  width: 38px; height: 38px;
+  border-radius: $radius-full;
+  @include flex-center;
+  background: $purp-600;
+  color: $white;
+  transition: $t-spring;
+  flex-shrink: 0;
+
+  &:hover:not(.sendDisabled) {
+    background: $purp-500;
+    transform: scale(1.05);
+    box-shadow: $shadow-purp;
+  }
+  &:active:not(.sendDisabled) { transform: scale(0.96); }
+
+  &.stopMode {
+    background: rgba($danger, 0.8);
+    &:hover { background: $danger; }
+  }
+  &.sendDisabled {
+    background: rgba($white, 0.07);
+    color: $slate-600;
+    cursor: not-allowed;
+  }
+}
+
+.hints {
+  @include flex-between;
+  padding: 0 $sp-2;
+}
+.hint {
+  font-size: $text-xs;
+  color: $slate-700;
+  kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-family: $font-mono;
+    background: rgba($white, 0.06);
+    border: 1px solid rgba($white, 0.1);
+    border-radius: 4px;
+    color: $slate-500;
+  }
+}
+.hintRight { font-size: 10px; color: $slate-700; }

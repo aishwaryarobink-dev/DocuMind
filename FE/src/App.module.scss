@@ -1,0 +1,163 @@
+@use "./styles/tokens" as *;
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  background: $bg-900;
+}
+
+// ── Topbar ────────────────────────────────────────────────────────────────────
+.topbar {
+  @include flex-between;
+  padding: $sp-3 $sp-6;
+  background: rgba($bg-800, 0.95);
+  border-bottom: 1px solid rgba($white, 0.07);
+  flex-shrink: 0;
+  backdrop-filter: blur(10px);
+  z-index: 10;
+
+  @include respond-to(sm) { padding: $sp-3 $sp-4; }
+}
+
+.topLeft  { display: flex; align-items: center; gap: $sp-3; }
+.topRight { display: flex; align-items: center; gap: $sp-3; }
+
+.menuBtn {
+  width: 36px; height: 36px;
+  border-radius: $radius-md;
+  @include flex-center;
+  color: $slate-500;
+  transition: $t-fast;
+  display: none;
+
+  @include respond-to(lg) { display: flex; }
+  &:hover { background: rgba($white, 0.07); color: $slate-300; }
+}
+
+.logoGroup { display: flex; align-items: center; gap: $sp-3; }
+.logoName  {
+  font-family: $font-display;
+  font-size: $text-xl;
+  color: $white;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.logoBadge {
+  font-size: $text-xs;
+  padding: 3px 10px;
+  background: rgba($purp-500, 0.1);
+  border: 1px solid rgba($purp-500, 0.2);
+  border-radius: $radius-full;
+  color: $purp-300;
+
+  @include respond-to(sm) { display: none; }
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.statusDot {
+  width: 7px; height: 7px;
+  border-radius: $radius-full;
+  background: $success;
+  box-shadow: 0 0 6px $success;
+  animation: pulse 2.5s ease infinite;
+}
+.statusText {
+  font-size: $text-xs;
+  color: $slate-600;
+
+  @include respond-to(sm) { display: none; }
+}
+
+.clearBtn {
+  display: flex;
+  align-items: center;
+  gap: $sp-2;
+  padding: $sp-2 $sp-3;
+  border-radius: $radius-md;
+  background: rgba($danger, 0.08);
+  border: 1px solid rgba($danger, 0.15);
+  color: rgba($danger, 0.7);
+  font-size: $text-sm;
+  transition: $t-fast;
+  animation: fadeIn 0.2s ease;
+
+  &:hover { background: rgba($danger, 0.15); color: $danger; }
+  span { @include respond-to(xs) { display: none; } }
+}
+
+// ── Body ──────────────────────────────────────────────────────────────────────
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.overlay {
+  display: none;
+  @include respond-to(lg) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba($bg-900, 0.7);
+    backdrop-filter: blur(2px);
+    z-index: 49;
+  }
+}
+
+.panelWrap {
+  flex-shrink: 0;
+  height: 100%;
+
+  @include respond-to(lg) {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100dvh;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+
+    &.panelOpen { transform: translateX(0); }
+  }
+}
+
+// ── Main chat ─────────────────────────────────────────────────────────────────
+.main {
+  flex: 1;
+  @include flex-col;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.messagesArea {
+  flex: 1;
+  overflow-y: auto;
+  @include scrollbar-thin;
+  position: relative;
+}
+
+.messagesList {
+  @include flex-col;
+  gap: $sp-6;
+  padding: $sp-6 $sp-8 $sp-4;
+  min-height: 100%;
+
+  @include respond-to(md) { padding: $sp-5; gap: $sp-5; }
+  @include respond-to(sm) { padding: $sp-4; gap: $sp-4; }
+}
+
+.anchor { height: 1px; flex-shrink: 0; }
+
+.inputArea {
+  padding: $sp-4 $sp-8 $sp-5;
+  flex-shrink: 0;
+  border-top: 1px solid rgba($white, 0.05);
+
+  @include respond-to(md) { padding: $sp-4 $sp-5; }
+  @include respond-to(sm) { padding: $sp-3 $sp-4 $sp-4; }
+}

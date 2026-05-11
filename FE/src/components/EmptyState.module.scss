@@ -1,0 +1,79 @@
+@use '../styles/tokens' as *;
+
+.wrap {
+  @include flex-center;
+  flex-direction: column;
+  gap: $sp-5;
+  height: 100%;
+  padding: $sp-8 $sp-6;
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.icon {
+  width: 60px; height: 60px;
+  border-radius: $radius-xl;
+  background: $purp-700;
+  @include flex-center;
+  color: $white;
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: $font-display;
+  font-size: $text-xl;
+  color: $white;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+.sub {
+  font-size: $text-sm;
+  color: $slate-500;
+  line-height: 1.65;
+}
+
+.suggestions {
+  @include flex-col;
+  gap: $sp-2;
+  width: 100%;
+  max-width: 420px;
+}
+.suggestion {
+  padding: $sp-3 $sp-4;
+  background: rgba($white, 0.04);
+  border: 1px solid rgba($white, 0.07);
+  border-radius: $radius-lg;
+  color: $slate-400;
+  font-size: $text-sm;
+  text-align: left;
+  transition: $t-base;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba($purp-500, 0.1);
+    border-color: rgba($purp-500, 0.25);
+    color: $slate-200;
+    transform: translateY(-1px);
+  }
+}
+
+.features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: $sp-3;
+  width: 100%;
+
+  @include respond-to(sm) { grid-template-columns: 1fr; }
+}
+.feature {
+  padding: $sp-4;
+  background: rgba($white, 0.03);
+  border: 1px solid rgba($white, 0.05);
+  border-radius: $radius-lg;
+  text-align: left;
+}
+.featureEmoji { font-size: 1.1rem; display: block; margin-bottom: $sp-2; }
+.featureTitle { font-size: $text-sm; font-weight: 600; color: $slate-200; margin-bottom: 2px; }
+.featureDesc  { font-size: $text-xs; color: $slate-600; line-height: 1.5; }
