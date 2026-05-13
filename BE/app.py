@@ -32,14 +32,20 @@ CORS(app, resources={r"/*": {
 CHROMA_PATH="./chroma_store"
 Path(CHROMA_PATH).mkdir(exist_ok=True)
 chroma_client=chromadb.PersistentClient(path=CHROMA_PATH)
-embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-    model_name="all-MiniLM-L6-v2"
-    )
+embed_fn = None
 sessions={}
 
 #groq 
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 MODEL = "llama-3.3-70b-versatile"
+
+def get_embed_fn():
+    global _embed_fn
+    if _embed_fn is None:
+        _embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+    return _embed_fn
 
 #get/creAte ChromaDB collention for session
 def get_collection(session_id: str):
@@ -47,7 +53,7 @@ def get_collection(session_id: str):
     col_name=f"session_{safe_id}"
     return chroma_client.get_or_create_collection(
         name=col_name, 
-        embedding_function=embed_fn,
+        embedding_function=get_embed_fn(),
         metadata={"hnsw:space": "cosine"}
     )
 
@@ -412,5 +418,5 @@ if __name__ == "__main__":
     print(f"\nDocuMind backend starting...")
     print(f"ChromaDB path: {CHROMA_PATH}")
     print(f"Embedding model: all-MiniLM-L6-v2 (loads on first upload)\n")
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
