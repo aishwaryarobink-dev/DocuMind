@@ -31,7 +31,7 @@ CORS(app, resources={r"/*": {
 CHROMA_PATH="/tmp/chroma_store"
 Path(CHROMA_PATH).mkdir(exist_ok=True)
 chroma_client=chromadb.PersistentClient(path=CHROMA_PATH)
-embed_fn = None
+_embed_fn = None
 sessions={}
 
 #groq 
