@@ -166,7 +166,7 @@ def health():
         "service":     "DocuMind",
         "day":         4,
         "chroma_path": CHROMA_PATH,
-        "collections": len(chroma_client.list_collections()),
+        # "collections": len(chroma_client.list_collections()),
         "model":       MODEL,
     })
 
