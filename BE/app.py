@@ -14,14 +14,14 @@ import pypdf
 import chromadb
 from chromadb.utils import embedding_functions
 from groq import Groq
-
+import threading
 load_dotenv()
 app=Flask(__name__)
 CORS(app, resources={r"/*": {
     "origins": [
         "http://localhost:5173",
         "http://localhost:5174",
-        "https://documind-clinical-ai.vercel.app/"
+        "https://documind-clinical-ai.vercel.app"
     ],
     "methods": ["GET", "POST", "DELETE", "OPTIONS"],
     "allow_headers": ["Content-Type", "Authorization"],
@@ -32,6 +32,17 @@ CHROMA_PATH="/tmp/chroma_store"
 Path(CHROMA_PATH).mkdir(exist_ok=True)
 chroma_client=chromadb.PersistentClient(path=CHROMA_PATH)
 _embed_fn = None
+
+def _prewarm_model():
+    print("Pre-warming embedding model in background...")
+    try:
+        get_embed_fn()
+        print("Embedding model ready!")
+    except Exception as e:
+        print(f"Pre-warm failed: {e}"
+
+threading.Thread(target=_prewarm_model, daemon=True).start()
+  
 sessions={}
 
 #groq 
