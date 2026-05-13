@@ -1,7 +1,6 @@
-""" 
-DocuMind day 4
-"""
-
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import os
 import io
 import json
@@ -29,7 +28,7 @@ CORS(app, resources={r"/*": {
     "supports_credentials": False
 }})
 #chroma db setup
-CHROMA_PATH="./chroma_store"
+CHROMA_PATH="/tmp/chroma_store"
 Path(CHROMA_PATH).mkdir(exist_ok=True)
 chroma_client=chromadb.PersistentClient(path=CHROMA_PATH)
 embed_fn = None
@@ -42,9 +41,13 @@ MODEL = "llama-3.3-70b-versatile"
 def get_embed_fn():
     global _embed_fn
     if _embed_fn is None:
-        _embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        try:
+            _embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name="all-MiniLM-L6-v2"
+            )
+        except Exception as e:
+            print(f"EMBED FN ERROR: {e}")
+            raise
     return _embed_fn
 
 #get/creAte ChromaDB collention for session
