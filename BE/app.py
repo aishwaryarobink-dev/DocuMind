@@ -50,16 +50,9 @@ groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 MODEL = "llama-3.3-70b-versatile"
 
 def get_embed_fn():
-    global _embed_fn
-    if _embed_fn is None:
-        try:
-            _embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-                model_name="all-MiniLM-L6-v2"
-            )
-        except Exception as e:
-            print(f"EMBED FN ERROR: {e}")
-            raise
-    return _embed_fn
+    # TEMPORARY TEST ONLY: This uses a basic default that might still use local resources
+    # but helps isolate if the specific SentenceTransformer call is the culprit.
+    return embedding_functions.DefaultEmbeddingFunction()
 
 #get/creAte ChromaDB collention for session
 def get_collection(session_id: str):
@@ -163,6 +156,10 @@ Do not make up information or use outside knowledge."""
     return messages
 
 #______________Routes_______________
+@app.route("/")
+def index():
+    return "DocuMind Backend is Running"
+
 @app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({
