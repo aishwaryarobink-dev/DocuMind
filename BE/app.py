@@ -39,7 +39,7 @@ def _prewarm_model():
         get_embed_fn()
         print("Embedding model ready!")
     except Exception as e:
-        print(f"Pre-warm failed: {e}"
+        print(f"Pre-warm failed: {e}")
 
 threading.Thread(target=_prewarm_model, daemon=True).start()
   
