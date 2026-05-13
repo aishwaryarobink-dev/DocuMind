@@ -5,5 +5,4 @@ groq
 python-dotenv
 pypdf
 chromadb
-# sentence-transformers
 pysqlite3-binary

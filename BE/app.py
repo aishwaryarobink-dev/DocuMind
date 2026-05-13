@@ -14,7 +14,6 @@ import pypdf
 import chromadb
 from chromadb.utils import embedding_functions
 from groq import Groq
-import threading
 load_dotenv()
 app=Flask(__name__)
 CORS(app, resources={r"/*": {
@@ -33,16 +32,6 @@ Path(CHROMA_PATH).mkdir(exist_ok=True)
 chroma_client=chromadb.PersistentClient(path=CHROMA_PATH)
 _embed_fn = None
 
-def _prewarm_model():
-    print("Pre-warming embedding model in background...")
-    try:
-        get_embed_fn()
-        print("Embedding model ready!")
-    except Exception as e:
-        print(f"Pre-warm failed: {e}")
-
-threading.Thread(target=_prewarm_model, daemon=True).start()
-  
 sessions={}
 
 #groq 
@@ -50,9 +39,19 @@ groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 MODEL = "llama-3.3-70b-versatile"
 
 def get_embed_fn():
-    # TEMPORARY TEST ONLY: This uses a basic default that might still use local resources
-    # but helps isolate if the specific SentenceTransformer call is the culprit.
-    return embedding_functions.DefaultEmbeddingFunction()
+    global _embed_fn
+    if _embed_fn is None:
+        try:
+            # This calls Hugging Face's API instead of loading the model locally
+            _embed_fn = embedding_functions.HuggingFaceEmbeddingFunction(
+                api_key=os.environ.get("HUGGINGFACE_API_KEY"),
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
+            print("Hugging Face API Embedding Function initialized.")
+        except Exception as e:
+            print(f"EMBED FN ERROR: {e}")
+            raise
+    return _embed_fn
 
 #get/creAte ChromaDB collention for session
 def get_collection(session_id: str):
