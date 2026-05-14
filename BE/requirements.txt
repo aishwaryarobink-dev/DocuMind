@@ -7,3 +7,4 @@ python-dotenv
 pypdf
 chromadb
 onnxruntime
+pysqlite3-binary
