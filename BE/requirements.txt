@@ -2,7 +2,8 @@ flask
 flask-cors
 gunicorn
 groq
+cohere
 python-dotenv
 pypdf
 chromadb
-pysqlite3-binary
+onnxruntime

@@ -12,7 +12,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 import pypdf
 import chromadb
-from chromadb.utils import embedding_functions
+from chromadb.utils.embedding_functions import CohereEmbeddingFunction
 from groq import Groq
 load_dotenv()
 app=Flask(__name__)
@@ -41,18 +41,12 @@ MODEL = "llama-3.3-70b-versatile"
 def get_embed_fn():
     global _embed_fn
     if _embed_fn is None:
-        try:
-            # This calls Hugging Face's API instead of loading the model locally
-            _embed_fn = embedding_functions.HuggingFaceEmbeddingFunction(
-                api_key=os.environ.get("HUGGINGFACE_API_KEY"),
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
-            )
-            print("Hugging Face API Embedding Function initialized.")
-        except Exception as e:
-            print(f"EMBED FN ERROR: {e}")
-            raise
+        _embed_fn = CohereEmbeddingFunction(
+            api_key=os.environ.get("COHERE_API_KEY"),
+            model_name="embed-english-light-v3.0"
+        )
+        print("Cohere embedder ready!")
     return _embed_fn
-
 #get/creAte ChromaDB collention for session
 def get_collection(session_id: str):
     safe_id= session_id[:36].replace("-","_")
@@ -161,14 +155,22 @@ def index():
 
 @app.route("/api/health", methods=["GET"])
 def health():
+    collections_count = "error" 
+    
+    try:
+        collections_count = len(chroma_client.list_collections())
+    except Exception as e:
+        print(f"Health check failed to list collections: {e}")
+    
     return jsonify({
         "status":      "ok",
         "service":     "DocuMind",
         "day":         4,
         "chroma_path": CHROMA_PATH,
-        # "collections": len(chroma_client.list_collections()),
+        "collections": collections_count,
         "model":       MODEL,
     })
+    
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
