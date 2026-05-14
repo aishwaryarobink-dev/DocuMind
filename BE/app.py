@@ -1,29 +1,29 @@
 try:
     __import__("pysqlite3")
     import sys
+
     sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
-except:
+except Exception:
     pass
 
-import os
 import io
 import json
+import os
 import uuid
 import hashlib
 from pathlib import Path
 
-from flask import Flask, request, jsonify, Response, stream_with_context
-from flask_cors import CORS
-from dotenv import load_dotenv
-
 import pypdf
-import chromadb
-from cohere import ClientV2 as CohereClient
-from groq import Groq
+from dotenv import load_dotenv
+from flask import Flask, Response, jsonify, request, stream_with_context
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
 load_dotenv()
 
 app = Flask(__name__)
+app.url_map.strict_slashes = False
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 CORS(
     app,
@@ -41,21 +41,57 @@ CORS(
 )
 
 CHROMA_PATH = os.environ.get("CHROMA_PATH", "/tmp/chroma_store")
-Path(CHROMA_PATH).mkdir(parents=True, exist_ok=True)
+MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+MAX_DISTANCE = float(os.environ.get("MAX_RAG_DISTANCE", "0.8"))
+EMBED_BATCH_SIZE = int(os.environ.get("EMBED_BATCH_SIZE", "64"))
 
-chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
-
-cohere_client = CohereClient(
-    api_key=os.environ.get("COHERE_API_KEY", "")
-)
-
-groq_client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY", "")
-)
-
-MODEL = "llama-3.3-70b-versatile"
+_chroma_client = None
+_cohere_client = None
+_groq_client = None
 
 sessions = {}
+
+
+def get_chroma_client():
+    global _chroma_client
+
+    if _chroma_client is None:
+        import chromadb
+
+        Path(CHROMA_PATH).mkdir(parents=True, exist_ok=True)
+        _chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
+
+    return _chroma_client
+
+
+def get_cohere_client():
+    global _cohere_client
+
+    if _cohere_client is None:
+        from cohere import ClientV2 as CohereClient
+
+        api_key = os.environ.get("COHERE_API_KEY")
+        if not api_key:
+            raise RuntimeError("COHERE_API_KEY is not configured")
+
+        _cohere_client = CohereClient(api_key=api_key)
+
+    return _cohere_client
+
+
+def get_groq_client():
+    global _groq_client
+
+    if _groq_client is None:
+        from groq import Groq
+
+        api_key = os.environ.get("GROQ_API_KEY")
+        if not api_key:
+            raise RuntimeError("GROQ_API_KEY is not configured")
+
+        _groq_client = Groq(api_key=api_key)
+
+    return _groq_client
 
 
 def extract_embeddings(response):
@@ -69,18 +105,24 @@ def extract_embeddings(response):
 
 
 def embed_documents(texts):
-    response = cohere_client.embed(
-        texts=texts,
-        model="embed-english-light-v3.0",
-        input_type="search_document",
-        embedding_types=["float"],
-    )
+    embeddings = []
+    cohere_client = get_cohere_client()
 
-    return extract_embeddings(response)
+    for start in range(0, len(texts), EMBED_BATCH_SIZE):
+        batch = texts[start : start + EMBED_BATCH_SIZE]
+        response = cohere_client.embed(
+            texts=batch,
+            model="embed-english-light-v3.0",
+            input_type="search_document",
+            embedding_types=["float"],
+        )
+        embeddings.extend(extract_embeddings(response))
+
+    return embeddings
 
 
 def embed_query(text):
-    response = cohere_client.embed(
+    response = get_cohere_client().embed(
         texts=[text],
         model="embed-english-light-v3.0",
         input_type="search_query",
@@ -93,7 +135,7 @@ def embed_query(text):
 def get_collection(session_id):
     safe_id = session_id[:36].replace("-", "_")
 
-    return chroma_client.get_or_create_collection(
+    return get_chroma_client().get_or_create_collection(
         name=f"session_{safe_id}",
         metadata={"hnsw:space": "cosine"},
     )
@@ -101,50 +143,42 @@ def get_collection(session_id):
 
 def extract_pdf_text(file_bytes):
     reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-
     pages = []
 
     for i, page in enumerate(reader.pages):
         text = page.extract_text()
 
         if text and text.strip():
-            pages.append({
-                "page": i + 1,
-                "text": text.strip()
-            })
+            pages.append({"page": i + 1, "text": text.strip()})
 
     return pages
 
 
-def split_into_chunks(
-    pages,
-    chunk_size=400,
-    overlap=50
-):
+def split_into_chunks(pages, chunk_size=900, overlap=120):
     chunks = []
 
     for page_data in pages:
         text = page_data["text"]
         page_num = page_data["page"]
-
         start = 0
 
         while start < len(text):
             end = min(start + chunk_size, len(text))
-
             chunk_text = text[start:end]
 
             if chunk_text.strip():
-                chunks.append({
-                    "text": chunk_text,
-                    "page": page_num,
-                    "chunk_index": len(chunks),
-                })
+                chunks.append(
+                    {
+                        "text": chunk_text,
+                        "page": page_num,
+                        "chunk_index": len(chunks),
+                    }
+                )
 
             if end == len(text):
                 break
 
-            start = end - overlap
+            start = max(end - overlap, start + 1)
 
     return chunks
 
@@ -153,52 +187,31 @@ def build_citations(metadatas, distances):
     citation_map = {}
 
     for meta, dist in zip(metadatas, distances):
-        if dist > 0.8:
+        if dist > MAX_DISTANCE:
             continue
 
         filename = meta.get("filename", "document")
         page = meta.get("page", "?")
-
-        if filename not in citation_map:
-            citation_map[filename] = set()
-
-        citation_map[filename].add(page)
+        citation_map.setdefault(filename, set()).add(page)
 
     return [
-        {
-            "filename": filename,
-            "pages": sorted(list(pages))
-        }
+        {"filename": filename, "pages": sorted(list(pages))}
         for filename, pages in citation_map.items()
     ]
 
 
-def build_rag_messages(
-    question,
-    chunks,
-    metadatas,
-    distances,
-    history
-):
+def build_rag_messages(question, chunks, metadatas, distances, history):
     context_parts = []
 
-    for chunk, meta, dist in zip(
-        chunks,
-        metadatas,
-        distances
-    ):
-        if dist > 0.8:
+    for chunk, meta, dist in zip(chunks, metadatas, distances):
+        if dist > MAX_DISTANCE:
             continue
 
         source = (
-            f"[Source: "
-            f"{meta.get('filename', 'document')}, "
+            f"[Source: {meta.get('filename', 'document')}, "
             f"Page {meta.get('page', '?')}]"
         )
-
-        context_parts.append(
-            f"{source}\n{chunk}"
-        )
+        context_parts.append(f"{source}\n{chunk}")
 
     context = "\n\n---\n\n".join(context_parts)
 
@@ -227,270 +240,186 @@ Reply with:
 "I could not find relevant information in the uploaded documents."
 """
 
-    messages = [
-        {
-            "role": "system",
-            "content": system_prompt
-        }
-    ]
+    messages = [{"role": "system", "content": system_prompt}]
 
     for h in history[-8:]:
         role = h.get("role")
         content = h.get("content", "").strip()
 
         if role in ["user", "assistant"] and content:
-            messages.append({
-                "role": role,
-                "content": content
-            })
+            messages.append({"role": role, "content": content})
 
-    messages.append({
-        "role": "user",
-        "content": question
-    })
-
+    messages.append({"role": "user", "content": question})
     return messages
 
 
 @app.route("/")
 def home():
-    return jsonify({
-        "status": "running",
-        "service": "DocuMind API",
-        "model": MODEL
-    })
+    return jsonify(
+        {
+            "status": "running",
+            "service": "DocuMind API",
+            "model": MODEL,
+        }
+    )
 
 
-@app.route("/api/health")
+@app.route("/api/health", methods=["GET"])
+@app.route("/api/health/", methods=["GET"])
 def health():
-    try:
-        collections = len(chroma_client.list_collections())
-    except:
-        collections = "error"
-
-    return jsonify({
-        "status": "ok",
-        "collections": collections,
-        "model": MODEL,
-        "chroma_path": CHROMA_PATH
-    })
+    return jsonify(
+        {
+            "status": "ok",
+            "service": "DocuMind API",
+            "model": MODEL,
+        }
+    )
 
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
     try:
         if "file" not in request.files:
-            return jsonify({
-                "error": "No file provided"
-            }), 400
+            return jsonify({"error": "No file provided"}), 400
 
         file = request.files["file"]
+        session_id = request.form.get("session_id") or str(uuid.uuid4())
+        filename = secure_filename(file.filename or "")
 
-        session_id = request.form.get(
-            "session_id",
-            str(uuid.uuid4())
-        )
-
-        if not file.filename.lower().endswith(".pdf"):
-            return jsonify({
-                "error": "Only PDF files supported"
-            }), 400
+        if not filename.lower().endswith(".pdf"):
+            return jsonify({"error": "Only PDF files supported"}), 400
 
         file_bytes = file.read()
 
-        if len(file_bytes) > 10 * 1024 * 1024:
-            return jsonify({
-                "error": "File exceeds 10MB limit"
-            }), 400
+        if len(file_bytes) > app.config["MAX_CONTENT_LENGTH"]:
+            return jsonify({"error": "File exceeds 10MB limit"}), 400
 
         doc_id = hashlib.md5(file_bytes).hexdigest()[:12]
-
         pages = extract_pdf_text(file_bytes)
 
         if not pages:
-            return jsonify({
-                "error": "No readable text found in PDF"
-            }), 400
+            return jsonify({"error": "No readable text found in PDF"}), 400
 
         chunks = split_into_chunks(pages)
-
         collection = get_collection(session_id)
+        existing = collection.get(ids=[f"{doc_id}_0"])
 
-        test = collection.get(ids=[f"{doc_id}_0"])
-
-        already_exists = len(test["ids"]) > 0
-
-        if not already_exists:
-            embeddings = embed_documents(
-                [c["text"] for c in chunks]
-            )
+        if not existing["ids"]:
+            embeddings = embed_documents([c["text"] for c in chunks])
 
             collection.add(
-                ids=[
-                    f"{doc_id}_{c['chunk_index']}"
-                    for c in chunks
-                ],
-                documents=[
-                    c["text"] for c in chunks
-                ],
+                ids=[f"{doc_id}_{c['chunk_index']}" for c in chunks],
+                documents=[c["text"] for c in chunks],
                 embeddings=embeddings,
                 metadatas=[
                     {
                         "doc_id": doc_id,
                         "page": c["page"],
-                        "filename": file.filename,
+                        "filename": filename,
                     }
                     for c in chunks
                 ],
             )
 
-        if session_id not in sessions:
-            sessions[session_id] = {}
-
-        sessions[session_id][doc_id] = {
-            "name": file.filename,
+        sessions.setdefault(session_id, {})[doc_id] = {
+            "name": filename,
             "pages": len(pages),
             "chunk_count": len(chunks),
         }
 
-        return jsonify({
-            "success": True,
-            "doc_id": doc_id,
-            "session_id": session_id,
-            "name": file.filename,
-            "pages": len(pages),
-            "chunk_count": len(chunks),
-        })
+        return jsonify(
+            {
+                "success": True,
+                "doc_id": doc_id,
+                "session_id": session_id,
+                "name": filename,
+                "pages": len(pages),
+                "chunk_count": len(chunks),
+            }
+        )
 
     except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/search", methods=["POST"])
 def search():
     try:
-        data = request.get_json()
-
+        data = request.get_json(silent=True) or {}
         question = data.get("question", "").strip()
         session_id = data.get("session_id", "").strip()
 
         if not question or not session_id:
-            return jsonify({
-                "error": "question and session_id required"
-            }), 400
+            return jsonify({"error": "question and session_id required"}), 400
 
         collection = get_collection(session_id)
 
         if collection.count() == 0:
-            return jsonify({
-                "error": "No documents found"
-            }), 400
-
-        query_embedding = embed_query(question)
+            return jsonify({"error": "No documents found"}), 400
 
         results = collection.query(
-            query_embeddings=[query_embedding],
+            query_embeddings=[embed_query(question)],
             n_results=min(3, collection.count()),
-            include=[
-                "documents",
-                "metadatas",
-                "distances"
-            ]
+            include=["documents", "metadatas", "distances"],
         )
 
-        chunks = results["documents"][0]
-        metadatas = results["metadatas"][0]
-        distances = results["distances"][0]
-
         formatted = []
-
         for chunk, meta, dist in zip(
-            chunks,
-            metadatas,
-            distances
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0],
         ):
-            formatted.append({
-                "text": chunk,
-                "filename": meta.get("filename"),
-                "page": meta.get("page"),
-                "distance": round(dist, 4),
-            })
+            formatted.append(
+                {
+                    "text": chunk,
+                    "filename": meta.get("filename"),
+                    "page": meta.get("page"),
+                    "distance": round(dist, 4),
+                }
+            )
 
-        return jsonify({
-            "results": formatted
-        })
+        return jsonify({"results": formatted})
 
     except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
     try:
-        data = request.get_json()
-
+        data = request.get_json(silent=True) or {}
         question = data.get("question", "").strip()
         session_id = data.get("session_id", "").strip()
         history = data.get("history", [])
 
         if not question:
-            return jsonify({
-                "error": "question required"
-            }), 400
+            return jsonify({"error": "question required"}), 400
 
         if not session_id:
-            return jsonify({
-                "error": "session_id required"
-            }), 400
+            return jsonify({"error": "session_id required"}), 400
 
         collection = get_collection(session_id)
 
         if collection.count() == 0:
-            return jsonify({
-                "error": "No uploaded documents"
-            }), 400
-
-        query_embedding = embed_query(question)
+            return jsonify({"error": "No uploaded documents"}), 400
 
         results = collection.query(
-            query_embeddings=[query_embedding],
+            query_embeddings=[embed_query(question)],
             n_results=min(3, collection.count()),
-            include=[
-                "documents",
-                "metadatas",
-                "distances"
-            ]
+            include=["documents", "metadatas", "distances"],
         )
 
         chunks = results["documents"][0]
         metadatas = results["metadatas"][0]
         distances = results["distances"][0]
-
-        citations = build_citations(
-            metadatas,
-            distances
-        )
-
-        messages = build_rag_messages(
-            question,
-            chunks,
-            metadatas,
-            distances,
-            history
-        )
+        citations = build_citations(metadatas, distances)
+        messages = build_rag_messages(question, chunks, metadatas, distances, history)
 
         def generate():
-            yield (
-                f"data: "
-                f"{json.dumps({'type': 'citations', 'citations': citations})}\n\n"
-            )
+            yield f"data: {json.dumps({'type': 'citations', 'citations': citations})}\n\n"
 
             try:
-                stream = groq_client.chat.completions.create(
+                stream = get_groq_client().chat.completions.create(
                     model=MODEL,
                     messages=messages,
                     temperature=0.3,
@@ -502,16 +431,10 @@ def chat():
                     text = chunk.choices[0].delta.content
 
                     if text:
-                        yield (
-                            f"data: "
-                            f"{json.dumps({'type': 'text', 'text': text})}\n\n"
-                        )
+                        yield f"data: {json.dumps({'type': 'text', 'text': text})}\n\n"
 
             except Exception as e:
-                yield (
-                    f"data: "
-                    f"{json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-                )
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
             yield "data: [DONE]\n\n"
 
@@ -526,49 +449,27 @@ def chat():
         )
 
     except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route(
-    "/api/documents/<session_id>/<doc_id>",
-    methods=["DELETE"]
-)
+@app.route("/api/documents/<session_id>/<doc_id>", methods=["DELETE"])
 def delete_document(session_id, doc_id):
     try:
         collection = get_collection(session_id)
-
-        existing = collection.get(
-            where={"doc_id": doc_id}
-        )
+        existing = collection.get(where={"doc_id": doc_id})
 
         if existing["ids"]:
-            collection.delete(
-                ids=existing["ids"]
-            )
+            collection.delete(ids=existing["ids"])
 
-        if (
-            session_id in sessions
-            and doc_id in sessions[session_id]
-        ):
+        if session_id in sessions and doc_id in sessions[session_id]:
             del sessions[session_id][doc_id]
 
-        return jsonify({
-            "success": True
-        })
+        return jsonify({"success": True})
 
     except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=False
-    )
+    app.run(host="0.0.0.0", port=port, debug=False)
