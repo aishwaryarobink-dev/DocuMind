@@ -192,6 +192,7 @@ def health():
 
 @app.route("/api/upload", methods=["POST"])
 def upload():
+    print("==> UPLOAD: request received")
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 
@@ -203,6 +204,7 @@ def upload():
 
     try:
         file_bytes = file.read()
+        print(f"==> UPLOAD: file read OK, size={len(file_bytes)} bytes")
     except Exception as e:
         return jsonify({"error": f"Could not read file: {str(e)}"}), 400
 
@@ -213,6 +215,7 @@ def upload():
 
     try:
         pages = extract_pdf_text(file_bytes)
+        print(f"==> UPLOAD: extracted {len(pages)} pages")
     except Exception as e:
         return jsonify({"error": f"Could not parse PDF: {str(e)}"}), 400
 
@@ -220,11 +223,12 @@ def upload():
         return jsonify({"error": "No text found in PDF"}), 400
 
     chunks = split_into_chunks(pages)
+    print(f"==> UPLOAD: split into {len(chunks)} chunks")
 
     try:
         collection = get_collection(session_id)
+        print("==> UPLOAD: got collection")
 
-        # Check for duplicate
         already_stored = False
         try:
             test = collection.get(ids=[f"{doc_id}_0"])
@@ -233,12 +237,11 @@ def upload():
             already_stored = False
 
         if already_stored:
-            print(f"Duplicate: {file.filename} ({doc_id}) — skipping")
+            print(f"==> UPLOAD: duplicate detected, skipping embed")
         else:
-            print(f"Uploading: {file.filename} | chunks: {len(chunks)}")
-
-            # Embed all chunks via Cohere API directly
+            print(f"==> UPLOAD: calling Cohere embed API for {len(chunks)} chunks...")
             embeddings = embed_documents([c["text"] for c in chunks])
+            print(f"==> UPLOAD: Cohere embed done, got {len(embeddings)} embeddings")
 
             collection.add(
                 ids=[f"{doc_id}_{c['chunk_index']}" for c in chunks],
@@ -250,9 +253,10 @@ def upload():
                     "filename": file.filename,
                 } for c in chunks],
             )
-            print(f"Stored {len(chunks)} chunks")
+            print(f"==> UPLOAD: stored {len(chunks)} chunks in ChromaDB")
 
     except Exception as e:
+        print(f"==> UPLOAD ERROR: {str(e)}")
         return jsonify({"error": f"Failed to store chunks: {str(e)}"}), 500
 
     if session_id not in sessions:

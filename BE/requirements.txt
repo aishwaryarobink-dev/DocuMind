@@ -8,3 +8,4 @@ pypdf
 chromadb
 onnxruntime
 pysqlite3-binary
+gevent
