@@ -12,7 +12,7 @@ import os
 import uuid
 import hashlib
 from pathlib import Path
-
+import threading
 import pypdf
 from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, request, stream_with_context
@@ -50,6 +50,18 @@ _cohere_client = None
 _groq_client = None
 
 sessions = {}
+upload_locks = {}
+upload_locks_guard = threading.Lock()
+
+
+def get_upload_lock(session_id, doc_id):
+    lock_key = f"{session_id}:{doc_id}"
+
+    with upload_locks_guard:
+        if lock_key not in upload_locks:
+            upload_locks[lock_key] = threading.Lock()
+
+        return upload_locks[lock_key]
 
 
 def get_chroma_client():
@@ -295,48 +307,83 @@ def upload():
             return jsonify({"error": "File exceeds 10MB limit"}), 400
 
         doc_id = hashlib.md5(file_bytes).hexdigest()[:12]
-        pages = extract_pdf_text(file_bytes)
-
-        if not pages:
-            return jsonify({"error": "No readable text found in PDF"}), 400
-
-        chunks = split_into_chunks(pages)
         collection = get_collection(session_id)
-        existing = collection.get(ids=[f"{doc_id}_0"])
 
-        if not existing["ids"]:
-            embeddings = embed_documents([c["text"] for c in chunks])
+        with get_upload_lock(session_id, doc_id):
+            existing = collection.get(
+                where={"doc_id": doc_id},
+                include=["metadatas"],
+            )
+
+            if existing["ids"]:
+                metadatas = existing.get("metadatas") or []
+                pages = sorted(
+                    {
+                        meta.get("page")
+                        for meta in metadatas
+                        if meta.get("page") is not None
+                    }
+                )
+
+                return jsonify({
+                    "success": False,
+                    "duplicate": True,
+                    "error": "Document already uploaded",
+                    "doc_id": doc_id,
+                    "session_id": session_id,
+                    "name": file.filename,
+                    "pages": len(pages),
+                    "chunk_count": len(existing["ids"]),
+                }), 409
+
+            pages = extract_pdf_text(file_bytes)
+
+            if not pages:
+                return jsonify({
+                    "error": "No readable text found in PDF"
+                }), 400
+
+            chunks = split_into_chunks(pages)
+
+            embeddings = embed_documents(
+                [c["text"] for c in chunks]
+            )
 
             collection.add(
-                ids=[f"{doc_id}_{c['chunk_index']}" for c in chunks],
-                documents=[c["text"] for c in chunks],
+                ids=[
+                    f"{doc_id}_{c['chunk_index']}"
+                    for c in chunks
+                ],
+                documents=[
+                    c["text"] for c in chunks
+                ],
                 embeddings=embeddings,
                 metadatas=[
                     {
                         "doc_id": doc_id,
                         "page": c["page"],
-                        "filename": filename,
+                        "filename": file.filename,
                     }
                     for c in chunks
                 ],
             )
 
-        sessions.setdefault(session_id, {})[doc_id] = {
-            "name": filename,
-            "pages": len(pages),
-            "chunk_count": len(chunks),
-        }
-
-        return jsonify(
-            {
-                "success": True,
-                "doc_id": doc_id,
-                "session_id": session_id,
+            sessions.setdefault(session_id, {})[doc_id] = {
                 "name": filename,
                 "pages": len(pages),
                 "chunk_count": len(chunks),
             }
-        )
+
+            return jsonify(
+                {
+                    "success": True,
+                    "doc_id": doc_id,
+                    "session_id": session_id,
+                    "name": filename,
+                    "pages": len(pages),
+                    "chunk_count": len(chunks),
+                }
+            )
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
